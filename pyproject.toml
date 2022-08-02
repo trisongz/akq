@@ -2,7 +2,6 @@
 testpaths = 'tests'
 filterwarnings = ['error']
 asyncio_mode = 'auto'
-timeout = 10
 
 [tool.coverage.run]
 source = ['src']
@@ -56,5 +55,5 @@ disallow_untyped_defs = true
 #warn_return_any = true
 
 [[tool.mypy.overrides]]
-module = ['redis.asyncio.*',  'watchgod']
+module = ['aiokeydb.*',  'watchgod']
 ignore_missing_imports = true

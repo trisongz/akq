@@ -6,10 +6,10 @@ from random import random
 
 import pytest
 
-import arq
-from arq import Worker
-from arq.constants import in_progress_key_prefix
-from arq.cron import cron, next_cron
+import akq
+from akq import Worker
+from akq.constants import in_progress_key_prefix
+from akq.cron import cron, next_cron
 
 
 @pytest.mark.parametrize(
@@ -93,7 +93,7 @@ async def foobar(ctx):
 
 
 @pytest.mark.parametrize('poll_delay', [0.0, 0.5, 0.9])
-async def test_job_successful(worker, caplog, arq_redis, poll_delay):
+async def test_job_successful(worker, caplog, arq_keydb, poll_delay):
     caplog.set_level(logging.INFO)
     worker: Worker = worker(cron_jobs=[cron(foobar, hour=1, run_at_startup=True)], poll_delay=poll_delay)
     await worker.main()
@@ -105,15 +105,15 @@ async def test_job_successful(worker, caplog, arq_redis, poll_delay):
     assert '  0.XXs → cron:foobar()\n  0.XXs ← cron:foobar ● 42' in log
 
     # Assert the in-progress key still exists.
-    keys = await arq_redis.keys(in_progress_key_prefix + '*')
+    keys = await arq_keydb.keys(in_progress_key_prefix + '*')
     assert len(keys) == 1
-    assert await arq_redis.pttl(keys[0]) > 0.0
+    assert await arq_keydb.pttl(keys[0]) > 0.0
 
 
 async def test_job_successful_on_specific_queue(worker, caplog):
     caplog.set_level(logging.INFO)
     worker: Worker = worker(
-        queue_name='arq:test-cron-queue', cron_jobs=[cron(foobar, hour=1, run_at_startup=True)], poll_delay=0.5
+        queue_name='akq:test-cron-queue', cron_jobs=[cron(foobar, hour=1, run_at_startup=True)], poll_delay=0.5
     )
     await worker.main()
     assert worker.jobs_complete == 1
@@ -147,7 +147,7 @@ async def test_str_function():
 
 
 async def test_cron_cancelled(worker, mocker):
-    mocker.patch.object(arq.worker, 'keep_cronjob_progress', 0.1)
+    mocker.patch.object(akq.worker, 'keep_cronjob_progress', 0.1)
 
     async def try_sleep(ctx):
         if ctx['job_try'] == 1:

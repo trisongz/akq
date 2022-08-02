@@ -13,7 +13,7 @@ try:
 except ImportError:  # pragma: no cover
     pytz = None  # type: ignore
 
-logger = logging.getLogger('arq.utils')
+logger = logging.getLogger('akq.utils')
 
 if TYPE_CHECKING:
     from .typing import SecondsTimedelta

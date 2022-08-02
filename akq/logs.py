@@ -13,8 +13,8 @@ def default_log_config(verbose: bool) -> Dict[str, Any]:
         'version': 1,
         'disable_existing_loggers': False,
         'handlers': {
-            'arq.standard': {'level': log_level, 'class': 'logging.StreamHandler', 'formatter': 'arq.standard'}
+            'akq.standard': {'level': log_level, 'class': 'logging.StreamHandler', 'formatter': 'akq.standard'}
         },
-        'formatters': {'arq.standard': {'format': '%(asctime)s: %(message)s', 'datefmt': '%H:%M:%S'}},
-        'loggers': {'arq': {'handlers': ['arq.standard'], 'level': log_level}},
+        'formatters': {'akq.standard': {'format': '%(asctime)s: %(message)s', 'datefmt': '%H:%M:%S'}},
+        'loggers': {'akq': {'handlers': ['akq.standard'], 'level': log_level}},
     }

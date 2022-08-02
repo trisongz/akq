@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# arq documentation build configuration file, created by
+# akq documentation build configuration file, created by
 # sphinx-quickstart on Sat Aug 13 12:25:33 2016.
 #
 # This file is execfile()d with the current directory set to its
@@ -19,7 +19,7 @@
 #
 import os
 import sys
-sys.path.append(os.path.abspath('../arq'))
+sys.path.append(os.path.abspath('../akq'))
 
 # -- General configuration ------------------------------------------------
 
@@ -60,7 +60,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'arq'
+project = 'akq'
 copyright = '2016, Samuel Colvin'
 author = 'Samuel Colvin'
 
@@ -68,7 +68,7 @@ author = 'Samuel Colvin'
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 
-from arq.version import VERSION
+from akq.version import VERSION
 # The short X.Y version. Could change this if you're updating docs for a previous version.
 version = f'v{VERSION}'
 # The full version, including alpha/beta/rc tags.
@@ -140,7 +140,7 @@ html_theme = 'alabaster'
 #
 html_theme_options = {
     'github_user': 'samuelcolvin',
-    'github_repo': 'arq',
+    'github_repo': 'akq',
     'travis_button': True,
     'codecov_button': True,
     'page_width': '1200px',
@@ -154,7 +154,7 @@ html_theme_options = {
 # The name for this set of Sphinx documents.
 # "<project> v<release> documentation" by default.
 #
-# html_title = 'arq v5'
+# html_title = 'akq v5'
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
 #
@@ -286,7 +286,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'arq.tex', 'arq Documentation',
+    (master_doc, 'akq.tex', 'akq Documentation',
      'Samuel Colvin', 'manual'),
 ]
 
@@ -328,7 +328,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'arq', 'arq Documentation',
+    (master_doc, 'akq', 'akq Documentation',
      [author], 1)
 ]
 
@@ -343,8 +343,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'arq', 'arq Documentation',
-     author, 'arq', 'One line description of project.',
+    (master_doc, 'akq', 'akq Documentation',
+     author, 'akq', 'One line description of project.',
      'Miscellaneous'),
 ]
 

@@ -7,12 +7,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Dict, Optional, Tuple
 
-from redis.asyncio import Redis
+from aiokeydb import AsyncKeyDB
 
 from .constants import abort_jobs_ss, default_queue_name, in_progress_key_prefix, job_key_prefix, result_key_prefix
 from .utils import ms_to_datetime, poll, timestamp_ms
 
-logger = logging.getLogger('arq.jobs')
+logger = logging.getLogger('akq.jobs')
 
 Serializer = Callable[[Dict[str, Any]], bytes]
 Deserializer = Callable[[bytes], Dict[str, Any]]
@@ -64,17 +64,17 @@ class Job:
     Holds data a reference to a job.
     """
 
-    __slots__ = 'job_id', '_redis', '_queue_name', '_deserializer'
+    __slots__ = 'job_id', '_keydb', '_queue_name', '_deserializer'
 
     def __init__(
         self,
         job_id: str,
-        redis: Redis,
+        keydb: AsyncKeyDB,
         _queue_name: str = default_queue_name,
         _deserializer: Optional[Deserializer] = None,
     ):
         self.job_id = job_id
-        self._redis = redis
+        self._keydb = keydb
         self._queue_name = _queue_name
         self._deserializer = _deserializer
 
@@ -86,7 +86,7 @@ class Job:
         it will be raised here.
 
         :param timeout: maximum time to wait for the job result before raising ``TimeoutError``, will wait forever
-        :param poll_delay: how often to poll redis for the job result
+        :param poll_delay: how often to poll keydb for the job result
         :param pole_delay: deprecated, use poll_delay instead
         """
         if pole_delay is not None:
@@ -114,11 +114,11 @@ class Job:
         """
         info: Optional[JobDef] = await self.result_info()
         if not info:
-            v = await self._redis.get(job_key_prefix + self.job_id)
+            v = await self._keydb.get(job_key_prefix + self.job_id)
             if v:
                 info = deserialize_job(v, deserializer=self._deserializer)
         if info:
-            info.score = await self._redis.zscore(self._queue_name, self.job_id)
+            info.score = await self._keydb.zscore(self._queue_name, self.job_id)
         return info
 
     async def result_info(self) -> Optional[JobResult]:
@@ -126,7 +126,7 @@ class Job:
         Information about the job result if available, does not wait for the result. Does not raise an exception
         even if the job raised one.
         """
-        v = await self._redis.get(result_key_prefix + self.job_id)
+        v = await self._keydb.get(result_key_prefix + self.job_id)
         if v:
             return deserialize_result(v, deserializer=self._deserializer)
         else:
@@ -136,12 +136,12 @@ class Job:
         """
         Status of the job.
         """
-        if await self._redis.exists(result_key_prefix + self.job_id):
+        if await self._keydb.exists(result_key_prefix + self.job_id):
             return JobStatus.complete
-        elif await self._redis.exists(in_progress_key_prefix + self.job_id):
+        elif await self._keydb.exists(in_progress_key_prefix + self.job_id):
             return JobStatus.in_progress
         else:
-            score = await self._redis.zscore(self._queue_name, self.job_id)
+            score = await self._keydb.zscore(self._queue_name, self.job_id)
             if not score:
                 return JobStatus.not_found
             return JobStatus.deferred if score > timestamp_ms() else JobStatus.queued
@@ -152,10 +152,10 @@ class Job:
 
         :param timeout: maximum time to wait for the job result before raising ``TimeoutError``,
             will wait forever on None
-        :param poll_delay: how often to poll redis for the job result
+        :param poll_delay: how often to poll keydb for the job result
         :return: True if the job aborted properly, False otherwise
         """
-        await self._redis.zadd(abort_jobs_ss, {self.job_id: timestamp_ms()})
+        await self._keydb.zadd(abort_jobs_ss, {self.job_id: timestamp_ms()})
         try:
             await self.result(timeout=timeout, poll_delay=poll_delay)
         except asyncio.CancelledError:
@@ -164,7 +164,7 @@ class Job:
             return False
 
     def __repr__(self) -> str:
-        return f'<arq job {self.job_id}>'
+        return f'<akq job {self.job_id}>'
 
 
 class SerializationError(RuntimeError):

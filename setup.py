@@ -3,17 +3,17 @@ from pathlib import Path
 from importlib.machinery import SourceFileLoader
 from setuptools import setup
 
-description = 'Job queues in python with asyncio and redis'
+description = 'Job queues in python with asyncio and keydb/redis'
 readme = Path(__file__).parent / 'README.md'
 if readme.exists():
     long_description = readme.read_text()
 else:
     long_description = description + '.\n\nSee https://arq-docs.helpmanual.io/ for documentation.'
 # avoid loading the package before requirements are installed:
-version = SourceFileLoader('version', 'arq/version.py').load_module()
+version = SourceFileLoader('version', 'akq/version.py').load_module()
 
 setup(
-    name='arq',
+    name='akq',
     version=version.VERSION,
     description=description,
     long_description=long_description,
@@ -43,19 +43,20 @@ setup(
         'Topic :: System :: Systems Administration',
     ],
     python_requires='>=3.6',
-    author='Samuel Colvin',
-    author_email='s@muelcolvin.com',
-    url='https://github.com/samuelcolvin/arq',
+    author='Samuel Colvin, Tri Songz',
+    author_email='ts@growthengineai.com',
+    url='https://github.com/trisongz/akq',
     license='MIT',
-    packages=['arq'],
-    package_data={'arq': ['py.typed']},
+    packages=['akq'],
+    package_data={'akq': ['py.typed']},
     zip_safe=True,
     entry_points="""
         [console_scripts]
-        arq=arq.cli:cli
+        akq=akq.cli:cli
     """,
     install_requires=[
-        'redis>=4.2.0rc2',
+        'aiokeydb>=0.0.9',
+        'prometheus_client>=0.14.1',
         'click>=6.7',
         'pydantic>=1',
         'dataclasses>=0.6;python_version == "3.6"',

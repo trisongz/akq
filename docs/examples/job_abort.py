@@ -1,6 +1,6 @@
 import asyncio
-from arq import create_pool
-from arq.connections import RedisSettings
+from akq import create_pool
+from akq.connections import RedisSettings
 
 
 async def do_stuff(ctx):

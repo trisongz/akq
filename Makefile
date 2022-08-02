@@ -21,7 +21,7 @@ lint:
 
 .PHONY: test
 test:
-	pytest --cov=arq
+	pytest --cov=akq
 
 .PHONY: testcov
 testcov: test
@@ -30,7 +30,7 @@ testcov: test
 
 .PHONY: mypy
 mypy:
-	mypy arq
+	mypy akq
 
 .PHONY: all
 all: lint mypy testcov

@@ -10,15 +10,14 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 from pydantic.validators import make_arbitrary_type_validator
-from redis.asyncio import ConnectionPool, Redis
-from redis.asyncio.sentinel import Sentinel
-from redis.exceptions import RedisError, WatchError
+from aiokeydb import AsyncConnectionPool, AsyncKeyDB, AsyncSentinel
+from aiokeydb.exceptions import KeyDBError, WatchError
 
 from .constants import default_queue_name, job_key_prefix, result_key_prefix
 from .jobs import Deserializer, Job, JobDef, JobResult, Serializer, deserialize_job, serialize_job
 from .utils import timestamp_ms, to_ms, to_unix_ms
 
-logger = logging.getLogger('arq.connections')
+logger = logging.getLogger('akq.connections')
 
 
 class SSLContext(ssl.SSLContext):
@@ -32,11 +31,11 @@ class SSLContext(ssl.SSLContext):
 
 
 @dataclass
-class RedisSettings:
+class KeyDBSettings:
     """
-    No-Op class used to hold redis connection redis_settings.
+    No-Op class used to hold keydb connection keydb_settings.
 
-    Used by :func:`arq.connections.create_pool` and :class:`arq.worker.Worker`.
+    Used by :func:`akq.connections.create_pool` and :class:`akq.worker.Worker`.
     """
 
     host: Union[str, List[Tuple[str, int]]] = 'localhost'
@@ -53,40 +52,40 @@ class RedisSettings:
     sentinel_master: str = 'mymaster'
 
     @classmethod
-    def from_dsn(cls, dsn: str) -> 'RedisSettings':
+    def from_dsn(cls, dsn: str) -> 'KeyDBSettings':
         conf = urlparse(dsn)
-        assert conf.scheme in {'redis', 'rediss'}, 'invalid DSN scheme'
-        return RedisSettings(
+        assert conf.scheme in {'keydb', 'keydbs', 'redis', 'rediss'}, 'invalid DSN scheme'
+        return KeyDBSettings(
             host=conf.hostname or 'localhost',
             port=conf.port or 6379,
-            ssl=conf.scheme == 'rediss',
+            ssl=conf.scheme in {'keydbs', 'rediss'},
             username=conf.username,
             password=conf.password,
             database=int((conf.path or '0').strip('/')),
         )
 
     def __repr__(self) -> str:
-        return 'RedisSettings({})'.format(', '.join(f'{k}={v!r}' for k, v in self.__dict__.items()))
+        return 'KeyDBSettings({})'.format(', '.join(f'{k}={v!r}' for k, v in self.__dict__.items()))
 
 
 # extra time after the job is expected to start when the job key should expire, 1 day in ms
 expires_extra_ms = 86_400_000
 
 
-class ArqRedis(Redis):  # type: ignore[misc]
+class ArqKeyDB(AsyncKeyDB):  # type: ignore[misc]
     """
-    Thin subclass of ``redis.asyncio.Redis`` which adds :func:`arq.connections.enqueue_job`.
+    Thin subclass of ``aiokeydb.asyncio.AsyncKeyDB`` which adds :func:`akq.connections.enqueue_job`.
 
-    :param redis_settings: an instance of ``arq.connections.RedisSettings``.
+    :param keydb_settings: an instance of ``akq.connections.KeyDBSettings``.
     :param job_serializer: a function that serializes Python objects to bytes, defaults to pickle.dumps
     :param job_deserializer: a function that deserializes bytes into Python objects, defaults to pickle.loads
-    :param default_queue_name: the default queue name to use, defaults to ``arq.queue``.
-    :param kwargs: keyword arguments directly passed to ``redis.asyncio.Redis``.
+    :param default_queue_name: the default queue name to use, defaults to ``akq.queue``.
+    :param kwargs: keyword arguments directly passed to ``aiokeydb.asyncio.AsyncKeyDB``.
     """
 
     def __init__(
         self,
-        pool_or_conn: Optional[ConnectionPool] = None,
+        pool_or_conn: Optional[AsyncConnectionPool] = None,
         job_serializer: Optional[Serializer] = None,
         job_deserializer: Optional[Deserializer] = None,
         default_queue_name: str = default_queue_name,
@@ -123,7 +122,7 @@ class ArqRedis(Redis):  # type: ignore[misc]
         :param _expires: if the job still hasn't started after this duration, do not run it
         :param _job_try: useful when re-enqueueing jobs within a job
         :param kwargs: any keyword arguments to pass to the function
-        :return: :class:`arq.jobs.Job` instance or ``None`` if a job with this ID already exists
+        :return: :class:`akq.jobs.Job` instance or ``None`` if a job with this ID already exists
         """
         if _queue_name is None:
             _queue_name = self.default_queue_name
@@ -159,7 +158,7 @@ class ArqRedis(Redis):  # type: ignore[misc]
             except WatchError:
                 # job got enqueued since we checked 'job_exists'
                 return None
-        return Job(job_id, redis=self, _queue_name=_queue_name, _deserializer=self.job_deserializer)
+        return Job(job_id, keydb=self, _queue_name=_queue_name, _deserializer=self.job_deserializer)
 
     async def _get_job_result(self, key: bytes) -> JobResult:
         job_id = key[len(result_key_prefix) :].decode()
@@ -172,7 +171,7 @@ class ArqRedis(Redis):  # type: ignore[misc]
 
     async def all_job_results(self) -> List[JobResult]:
         """
-        Get results for all jobs in redis.
+        Get results for all jobs in keydb.
         """
         keys = await self.keys(result_key_prefix + '*')
         results = await asyncio.gather(*[self._get_job_result(k) for k in keys])
@@ -193,19 +192,19 @@ class ArqRedis(Redis):  # type: ignore[misc]
 
 
 async def create_pool(
-    settings_: RedisSettings = None,
+    settings_: KeyDBSettings = None,
     *,
     retry: int = 0,
     job_serializer: Optional[Serializer] = None,
     job_deserializer: Optional[Deserializer] = None,
     default_queue_name: str = default_queue_name,
-) -> ArqRedis:
+) -> ArqKeyDB:
     """
-    Create a new redis pool, retrying up to ``conn_retries`` times if the connection fails.
+    Create a new keydb pool, retrying up to ``conn_retries`` times if the connection fails.
 
-    Returns a :class:`arq.connections.ArqRedis` instance, thus allowing job enqueuing.
+    Returns a :class:`akq.connections.ArqKeyDB` instance, thus allowing job enqueuing.
     """
-    settings: RedisSettings = RedisSettings() if settings_ is None else settings_
+    settings: KeyDBSettings = KeyDBSettings() if settings_ is None else settings_
 
     assert not (
         type(settings.host) is str and settings.sentinel
@@ -213,13 +212,13 @@ async def create_pool(
 
     if settings.sentinel:
 
-        def pool_factory(*args: Any, **kwargs: Any) -> ArqRedis:
-            client = Sentinel(*args, sentinels=settings.host, ssl=settings.ssl, **kwargs)
-            return client.master_for(settings.sentinel_master, redis_class=ArqRedis)
+        def pool_factory(*args: Any, **kwargs: Any) -> ArqKeyDB:
+            client = AsyncSentinel(*args, sentinels=settings.host, ssl=settings.ssl, **kwargs)
+            return client.master_for(settings.sentinel_master, keydb_class=ArqKeyDB)
 
     else:
         pool_factory = functools.partial(
-            ArqRedis,
+            ArqKeyDB,
             host=settings.host,
             port=settings.port,
             socket_connect_timeout=settings.conn_timeout,
@@ -235,10 +234,10 @@ async def create_pool(
         pool.default_queue_name = default_queue_name
         await pool.ping()
 
-    except (ConnectionError, OSError, RedisError, asyncio.TimeoutError) as e:
+    except (ConnectionError, OSError, KeyDBError, asyncio.TimeoutError) as e:
         if retry < settings.conn_retries:
             logger.warning(
-                'redis connection error %s:%s %s %s, %d retries remaining...',
+                'KeyDB connection error %s:%s %s %s, %d retries remaining...',
                 settings.host,
                 settings.port,
                 e.__class__.__name__,
@@ -250,7 +249,7 @@ async def create_pool(
             raise
     else:
         if retry > 0:
-            logger.info('redis connection successful')
+            logger.info('KeyDB connection successful')
         return pool
 
     # recursively attempt to create the pool outside the except block to avoid
@@ -264,8 +263,8 @@ async def create_pool(
     )
 
 
-async def log_redis_info(redis: Redis, log_func: Callable[[str], Any]) -> None:
-    async with redis.pipeline(transaction=True) as pipe:
+async def log_keydb_info(keydb: AsyncKeyDB, log_func: Callable[[str], Any]) -> None:
+    async with keydb.pipeline(transaction=True) as pipe:
         pipe.info(section='Server')
         pipe.info(section='Memory')
         pipe.info(section='Clients')
@@ -282,3 +281,4 @@ async def log_redis_info(redis: Redis, log_func: Callable[[str], Any]) -> None:
         f'clients_connected={clients_connected} '
         f'db_keys={key_count}'
     )
+

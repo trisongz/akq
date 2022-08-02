@@ -1,7 +1,7 @@
 import pytest
 from click.testing import CliRunner
 
-from arq.cli import cli
+from akq.cli import cli
 
 
 async def foobar(ctx):
@@ -17,7 +17,7 @@ def test_help():
     runner = CliRunner()
     result = runner.invoke(cli, ['--help'])
     assert result.exit_code == 0
-    assert result.output.startswith('Usage: arq [OPTIONS] WORKER_SETTINGS\n')
+    assert result.output.startswith('Usage: akq [OPTIONS] WORKER_SETTINGS\n')
 
 
 def test_run(cancel_remaining_task, mocker, loop):
@@ -45,4 +45,4 @@ def test_run_watch(mocker, cancel_remaining_task):
     runner = CliRunner()
     result = runner.invoke(cli, ['tests.test_cli.WorkerSettings', '--watch', 'tests'])
     assert result.exit_code == 0
-    assert '1 files changes, reloading arq worker...'
+    assert '1 files changes, reloading akq worker...'

@@ -6,9 +6,22 @@ import sys
 import msgpack
 import pytest
 
-from arq.connections import ArqRedis, create_pool
-from arq.worker import Worker
+from akq.connections import ArqKeyDB, create_pool
+from akq.worker import Worker
 
+from prometheus_client import CollectorRegistry
+
+from akq.metrics import ArqPrometheusMetrics
+
+
+@pytest.fixture
+def registry():
+    return CollectorRegistry()
+
+
+@pytest.fixture
+def arq_prom_instance(registry):
+    return ArqPrometheusMetrics(ctx={}, registry=registry, enable_webserver=False)
 
 @pytest.fixture(name='loop')
 def _fix_loop(event_loop):
@@ -16,42 +29,42 @@ def _fix_loop(event_loop):
 
 
 @pytest.fixture
-async def arq_redis(loop):
-    redis_ = ArqRedis(
+async def arq_keydb(loop):
+    keydb_ = ArqKeyDB(
         host='localhost',
         port=6379,
         encoding='utf-8',
     )
 
-    await redis_.flushall()
+    await keydb_.flushall()
 
-    yield redis_
+    yield keydb_
 
-    await redis_.close(close_connection_pool=True)
+    await keydb_.close(close_connection_pool=True)
 
 
 @pytest.fixture
-async def arq_redis_msgpack(loop):
-    redis_ = ArqRedis(
+async def arq_keydb_msgpack(loop):
+    keydb_ = ArqKeyDB(
         host='localhost',
         port=6379,
         encoding='utf-8',
         job_serializer=msgpack.packb,
         job_deserializer=functools.partial(msgpack.unpackb, raw=False),
     )
-    await redis_.flushall()
-    yield redis_
-    await redis_.close(close_connection_pool=True)
+    await keydb_.flushall()
+    yield keydb_
+    await keydb_.close(close_connection_pool=True)
 
 
 @pytest.fixture
-async def worker(arq_redis):
+async def worker(arq_keydb):
     worker_: Worker = None
 
-    def create(functions=[], burst=True, poll_delay=0, max_jobs=10, arq_redis=arq_redis, **kwargs):
+    def create(functions=[], burst=True, poll_delay=0, max_jobs=10, arq_keydb=arq_keydb, **kwargs):
         nonlocal worker_
         worker_ = Worker(
-            functions=functions, redis_pool=arq_redis, burst=burst, poll_delay=poll_delay, max_jobs=max_jobs, **kwargs
+            functions=functions, keydb_pool=arq_keydb, burst=burst, poll_delay=poll_delay, max_jobs=max_jobs, **kwargs
         )
         return worker_
 

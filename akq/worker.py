@@ -10,12 +10,12 @@ from time import time
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union, cast
 
 from pydantic.utils import import_string
-from redis.exceptions import ResponseError, WatchError
+from aiokeydb.exceptions import ResponseError, WatchError
 
-from arq.cron import CronJob
-from arq.jobs import Deserializer, JobResult, SerializationError, Serializer, deserialize_job_raw, serialize_result
+from akq.cron import CronJob
+from akq.jobs import Deserializer, JobResult, SerializationError, Serializer, deserialize_job_raw, serialize_result
 
-from .connections import ArqRedis, RedisSettings, create_pool, log_redis_info
+from .connections import ArqKeyDB, KeyDBSettings, create_pool, log_keydb_info
 from .constants import (
     abort_job_max_age,
     abort_jobs_ss,
@@ -32,7 +32,7 @@ from .utils import args_to_string, ms_to_datetime, poll, timestamp_ms, to_ms, to
 if TYPE_CHECKING:
     from .typing import SecondsTimedelta, StartupShutdown, WorkerCoroutine, WorkerSettingsType  # noqa F401
 
-logger = logging.getLogger('arq.worker')
+logger = logging.getLogger('akq.worker')
 no_result = object()
 
 
@@ -130,11 +130,11 @@ class Worker:
     Main class for running jobs.
 
     :param functions: list of functions to register, can either be raw coroutine functions or the
-      result of :func:`arq.worker.func`.
+      result of :func:`akq.worker.func`.
     :param queue_name: queue name to get jobs from
-    :param cron_jobs:  list of cron jobs to run, use :func:`arq.cron.cron` to create them
-    :param redis_settings: settings for creating a redis connection
-    :param redis_pool: existing redis pool, generally None
+    :param cron_jobs:  list of cron jobs to run, use :func:`akq.cron.cron` to create them
+    :param keydb_settings: settings for creating a keydb connection
+    :param keydb_pool: existing keydb pool, generally None
     :param burst: whether to stop the worker once all jobs have been run
     :param on_startup: coroutine function to run at startup
     :param on_shutdown: coroutine function to run at shutdown
@@ -151,10 +151,10 @@ class Worker:
                              equals ``max_jobs`` * 5, or 100; whichever is higher.
     :param max_tries: default maximum number of times to retry a job
     :param health_check_interval: how often to set the health check key
-    :param health_check_key: redis key under which health check is set
+    :param health_check_key: keydb key under which health check is set
     :param ctx: dictionary to hold extra user defined state
     :param retry_jobs: whether to retry jobs on Retry or CancelledError or not
-    :param allow_abort_jobs: whether to abort jobs on a call to :func:`arq.jobs.Job.abort`
+    :param allow_abort_jobs: whether to abort jobs on a call to :func:`akq.jobs.Job.abort`
     :param max_burst_jobs: the maximum number of jobs to process in burst mode (disabled with negative values)
     :param job_serializer: a function that serializes Python objects to bytes, defaults to pickle.dumps
     :param job_deserializer: a function that deserializes bytes into Python objects, defaults to pickle.loads
@@ -166,8 +166,8 @@ class Worker:
         *,
         queue_name: Optional[str] = default_queue_name,
         cron_jobs: Optional[Sequence[CronJob]] = None,
-        redis_settings: RedisSettings = None,
-        redis_pool: ArqRedis = None,
+        keydb_settings: KeyDBSettings = None,
+        keydb_pool: ArqKeyDB = None,
         burst: bool = False,
         on_startup: Optional['StartupShutdown'] = None,
         on_shutdown: Optional['StartupShutdown'] = None,
@@ -192,10 +192,10 @@ class Worker:
     ):
         self.functions: Dict[str, Union[Function, CronJob]] = {f.name: f for f in map(func, functions)}
         if queue_name is None:
-            if redis_pool is not None:
-                queue_name = redis_pool.default_queue_name
+            if keydb_pool is not None:
+                queue_name = keydb_pool.default_queue_name
             else:
-                raise ValueError('If queue_name is absent, redis_pool must be present.')
+                raise ValueError('If queue_name is absent, keydb_pool must be present.')
         self.queue_name = queue_name
         self.cron_jobs: List[CronJob] = []
         if cron_jobs is not None:
@@ -221,11 +221,11 @@ class Worker:
             self.health_check_key = self.queue_name + health_check_key_suffix
         else:
             self.health_check_key = health_check_key
-        self._pool = redis_pool
+        self._pool = keydb_pool
         if self._pool is None:
-            self.redis_settings: Optional[RedisSettings] = redis_settings or RedisSettings()
+            self.keydb_settings: Optional[KeyDBSettings] = keydb_settings or KeyDBSettings()
         else:
-            self.redis_settings = None
+            self.keydb_settings = None
         # self.tasks holds references to run_job coroutines currently running
         self.tasks: Dict[str, asyncio.Task[Any]] = {}
         # self.job_tasks holds references the actual jobs running
@@ -275,7 +275,7 @@ class Worker:
 
     async def run_check(self, retry_jobs: Optional[bool] = None, max_burst_jobs: Optional[int] = None) -> int:
         """
-        Run :func:`arq.worker.Worker.async_run`, check for failed jobs and raise :class:`arq.worker.FailedJobs`
+        Run :func:`akq.worker.Worker.async_run`, check for failed jobs and raise :class:`akq.worker.FailedJobs`
         if any jobs have failed.
 
         :return: number of completed jobs
@@ -292,21 +292,21 @@ class Worker:
             return self.jobs_complete
 
     @property
-    def pool(self) -> ArqRedis:
-        return cast(ArqRedis, self._pool)
+    def pool(self) -> ArqKeyDB:
+        return cast(ArqKeyDB, self._pool)
 
     async def main(self) -> None:
         if self._pool is None:
             self._pool = await create_pool(
-                self.redis_settings,
+                self.keydb_settings,
                 job_deserializer=self.job_deserializer,
                 job_serializer=self.job_serializer,
                 default_queue_name=self.queue_name,
             )
 
         logger.info('Starting worker for %d functions: %s', len(self.functions), ', '.join(self.functions))
-        await log_redis_info(self.pool, logger.info)
-        self.ctx['redis'] = self.pool
+        await log_keydb_info(self.pool, logger.info)
+        self.ctx['keydb'] = self.pool
         if self.on_startup:
             await self.on_startup(self.ctx)
 
@@ -772,21 +772,21 @@ def run_worker(settings_cls: 'WorkerSettingsType', **kwargs: Any) -> Worker:
 
 
 async def async_check_health(
-    redis_settings: Optional[RedisSettings], health_check_key: Optional[str] = None, queue_name: Optional[str] = None
+    keydb_settings: Optional[KeyDBSettings], health_check_key: Optional[str] = None, queue_name: Optional[str] = None
 ) -> int:
-    redis_settings = redis_settings or RedisSettings()
-    redis: ArqRedis = await create_pool(redis_settings)
+    keydb_settings = keydb_settings or KeyDBSettings()
+    keydb: ArqKeyDB = await create_pool(keydb_settings)
     queue_name = queue_name or default_queue_name
     health_check_key = health_check_key or (queue_name + health_check_key_suffix)
 
-    data = await redis.get(health_check_key)
+    data = await keydb.get(health_check_key)
     if not data:
         logger.warning('Health check failed: no health check sentinel value found')
         r = 1
     else:
         logger.info('Health check successful: %s', data)
         r = 0
-    await redis.close(close_connection_pool=True)
+    await keydb.close(close_connection_pool=True)
     return r
 
 
@@ -796,7 +796,7 @@ def check_health(settings_cls: 'WorkerSettingsType') -> int:
     :return: 0 if successful, 1 if not
     """
     cls_kwargs = get_kwargs(settings_cls)
-    redis_settings = cast(Optional[RedisSettings], cls_kwargs.get('redis_settings'))
+    keydb_settings = cast(Optional[KeyDBSettings], cls_kwargs.get('keydb_settings'))
     health_check_key = cast(Optional[str], cls_kwargs.get('health_check_key'))
     queue_name = cast(Optional[str], cls_kwargs.get('queue_name'))
-    return asyncio.run(async_check_health(redis_settings, health_check_key, queue_name))
+    return asyncio.run(async_check_health(keydb_settings, health_check_key, queue_name))

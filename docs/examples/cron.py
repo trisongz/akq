@@ -1,4 +1,4 @@
-from arq import cron
+from akq import cron
 
 async def run_regularly(ctx):
     print('run foo job at 9.12am, 12.12pm and 6.12pm')
