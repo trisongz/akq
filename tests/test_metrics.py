@@ -37,7 +37,7 @@ async def test_client_called_once(registry, akeydb_mock):
     # Easy coroutine mock
     keydb = akeydb_mock()
 
-    ctx = {"keydb": keydb}
+    ctx = {'keydb': keydb}
     arq_prom_instance = ArqPrometheusMetrics(
         ctx=ctx,
         registry=registry,
@@ -57,7 +57,7 @@ async def test_client_called_some_times(registry, akeydb_mock):
     # Easy coroutine mock
     keydb = akeydb_mock()
 
-    ctx = {"keydb": keydb}
+    ctx = {'keydb': keydb}
     arq_prom_instance = ArqPrometheusMetrics(
         ctx=ctx,
         registry=registry,
@@ -80,9 +80,9 @@ async def test_integration_read_sequence_and_report_properly(
 
     # Mock data
     read_sequence = [
-        futures_factory("j_complete=0 j_failed=0 j_retried=0 j_ongoing=0 queued=0"),
-        futures_factory("j_complete=1 j_failed=0 j_retried=0 j_ongoing=0 queued=4"),
-        futures_factory("j_complete=4 j_failed=8 j_retried=0 j_ongoing=235 queued=119"),
+        futures_factory('j_complete=0 j_failed=0 j_retried=0 j_ongoing=0 queued=0'),
+        futures_factory('j_complete=1 j_failed=0 j_retried=0 j_ongoing=0 queued=4'),
+        futures_factory('j_complete=4 j_failed=8 j_retried=0 j_ongoing=235 queued=119'),
         mocker.DEFAULT,
         mocker.DEFAULT,
     ]
@@ -90,7 +90,7 @@ async def test_integration_read_sequence_and_report_properly(
     keydb.get.side_effect = read_sequence
 
     # Initialize our arq prom instance
-    ctx = {"keydb": keydb}
+    ctx = {'keydb': keydb}
     arq_prom_instance = ArqPrometheusMetrics(
         ctx=ctx,
         registry=registry,
@@ -103,15 +103,15 @@ async def test_integration_read_sequence_and_report_properly(
     # Let it sleep for a sec, it should gather all metrics
     await asyncio.sleep(1)
     # We ask the web server for the metrics result
-    http_contents = urllib.request.urlopen("http://localhost:8081").read()
+    http_contents = urllib.request.urlopen('http://localhost:8081').read()
     # Stop everything
     await arq_prom_instance.stop()
 
     # Assert results
     keydb.get.assert_called_with(arq_prom_instance.health_check_key)
     assert 8 > keydb.get.call_count > 3
-    assert b"arq_jobs_completed 4.0" in http_contents
-    assert b"arq_jobs_failed 8.0" in http_contents
-    assert b"arq_jobs_retried 0.0" in http_contents
-    assert b"arq_jobs_ongoing 235.0" in http_contents
-    assert b"arq_queued_inprogress 119.0" in http_contents
+    assert b'arq_jobs_completed 4.0' in http_contents
+    assert b'arq_jobs_failed 8.0' in http_contents
+    assert b'arq_jobs_retried 0.0' in http_contents
+    assert b'arq_jobs_ongoing 235.0' in http_contents
+    assert b'arq_queued_inprogress 119.0' in http_contents
