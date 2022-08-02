@@ -5,13 +5,11 @@ import sys
 
 import msgpack
 import pytest
-
-from akq.connections import ArqKeyDB, create_pool
-from akq.worker import Worker
-
 from prometheus_client import CollectorRegistry
 
+from akq.connections import ArqKeyDB, create_pool
 from akq.metrics import ArqPrometheusMetrics
+from akq.worker import Worker
 
 
 @pytest.fixture

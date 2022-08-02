@@ -3,8 +3,8 @@ import re
 from datetime import timedelta
 
 import pytest
-from pydantic import BaseModel, validator
 from aiokeydb.exceptions import ConnectionError, ResponseError
+from pydantic import BaseModel, validator
 
 import akq.typing
 import akq.utils
