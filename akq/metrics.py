@@ -13,7 +13,7 @@ import prometheus_client as prom
 from akq.connections import ArqKeyDB
 from akq.constants import default_queue_name, health_check_key_suffix
 
-logger = logging.getLogger("akq.metrics")
+logger = logging.getLogger('akq.metrics')
 
 
 async def read_health_check_key(
@@ -24,7 +24,7 @@ async def read_health_check_key(
     return data
 
 
-HEALTH_REGEX = "j_complete=(?P<completed>[0-9]+).j_failed=(?P<failed>[0-9]+).j_retried=(?P<retried>[0-9]+).j_ongoing=(?P<ongoing>[0-9]+).queued=(?P<queued>[0-9]+)"  # noqa
+HEALTH_REGEX = 'j_complete=(?P<completed>[0-9]+).j_failed=(?P<failed>[0-9]+).j_retried=(?P<retried>[0-9]+).j_ongoing=(?P<ongoing>[0-9]+).queued=(?P<queued>[0-9]+)'  # noqa
 
 
 class ArqPrometheusMetrics:
@@ -35,9 +35,9 @@ class ArqPrometheusMetrics:
         arq_prometheus = ArqPrometheusMetrics(
             ctx, delay=delay, enable_webserver=True
         )
-        ctx["arq_prometheus"] = await arq_prometheus.start()
+        ctx['arq_prometheus'] = await arq_prometheus.start()
     async def shutdown(ctx):
-        await ctx["arq_prometheus"].stop()
+        await ctx['arq_prometheus'].stop()
     class WorkerSettings:
         on_startup = startup
         on_shutdown = shutdown
@@ -54,7 +54,7 @@ class ArqPrometheusMetrics:
         health_check_key: Optional[str] = None,
         delay: datetime.timedelta = datetime.timedelta(seconds=5),
         enable_webserver: bool = True,
-        addr: str = "0.0.0.0",
+        addr: str = '0.0.0.0',
         port: int = 8081,
         registry: prom.CollectorRegistry = prom.REGISTRY,
     ):
@@ -93,77 +93,77 @@ class ArqPrometheusMetrics:
         self.registry = registry
 
         self.jobs_completed = prom.Gauge(
-            "arq_jobs_completed",
-            "The number of jobs completed.",
+            'arq_jobs_completed',
+            'The number of jobs completed.',
             registry=registry,
         )
         self.jobs_failed = prom.Gauge(
-            "arq_jobs_failed",
-            "The total number of errored jobs.",
+            'arq_jobs_failed',
+            'The total number of errored jobs.',
             registry=registry,
         )
 
         self.jobs_retried = prom.Gauge(
-            "arq_jobs_retried",
-            "The total number of retried jobs.",
+            'arq_jobs_retried',
+            'The total number of retried jobs.',
             registry=registry,
         )
 
         self.jobs_ongoing = prom.Gauge(
-            "arq_jobs_ongoing",
-            "The number of jobs in progress.",
+            'arq_jobs_ongoing',
+            'The number of jobs in progress.',
             registry=registry,
         )
 
         self.jobs_queued = prom.Gauge(
-            "arq_queued_inprogress",
-            "The number of jobs in progress.",
+            'arq_queued_inprogress',
+            'The number of jobs in progress.',
             registry=registry,
         )
 
     async def start(self):
         """Initialize loop and maybe webserver."""
-        logger.info("[metrics] Initializing prometheus...")
-        logger.debug(f"[metrics] `queue_name`: '{self.queue_name}'")
-        logger.debug(f"[metrics] `health_check_key`: '{self.health_check_key}'")
+        logger.info('[metrics] Initializing prometheus...')
+        logger.debug(f'[metrics] `queue_name`: "{self.queue_name}"')
+        logger.debug(f'[metrics] `health_check_key`: "{self.health_check_key}"')
 
         await self.start_metrics_task()
         if self.enable_webserver:
-            logger.info("[metrics] Starting webserver in separate thread...")
+            logger.info('[metrics] Starting webserver in separate thread...')
             self.start_webserver()
-            logger.info("[metrics] Webserver up and running!")
-        logger.info("[metrics] Init complete!")
+            logger.info('[metrics] Webserver up and running!')
+        logger.info('[metrics] Init complete!')
         return self
 
     async def stop(self):
         """Terminate the metrics task"""
-        logger.info("[metrics] Stopping prometheus...")
+        logger.info('[metrics] Stopping prometheus...')
         if self._metrics_task is not None:
             self._metrics_task.cancel()
-        logger.info("[metrics] Stop complete!")
+        logger.info('[metrics] Stop complete!')
 
     async def metrics_task(self):
         while True:
             # Sleep first to let worker initialize itself.
             await asyncio.sleep(self.delay)
-            logger.debug(f"[metrics] Gathering metrics (interval {self.delay}s)")
+            logger.debug(f'[metrics] Gathering metrics (interval {self.delay}s)')
 
-            keydb = self.ctx["keydb"]
+            keydb = self.ctx['keydb']
             results = await read_health_check_key(keydb, self.health_check_key)
 
             if results is None:
                 logger.warning(
-                    "[metrics] Health key could not be read, value is `None`.\n"
-                    "Possible causes:\n"
-                    "- health key has not been initialized by the worker yet\n"
-                    "- `health_check_key` or `queue_name` settings may be wrong\n"
-                    "Retrying..."
+                    '[metrics] Health key could not be read, value is `None`.\n'
+                    'Possible causes:\n'
+                    '- health key has not been initialized by the worker yet\n'
+                    '- `health_check_key` or `queue_name` settings may be wrong\n'
+                    'Retrying...'
                 )
                 continue
-            logger.debug(f"[metrics] {results}")
+            logger.debug(f'[metrics] {results}')
             parsed = self.parse(results)
             if parsed is None:
-                logger.warning("[metrics] unexpected health check result")
+                logger.warning('[metrics] unexpected health check result')
                 continue
 
             await asyncio.get_event_loop().run_in_executor(
@@ -178,7 +178,7 @@ class ArqPrometheusMetrics:
         return {key: int(value) for key, value in parsed.groupdict().items()}
 
     async def start_metrics_task(self) -> None:
-        logger.debug("[metrics] Starting metrics task...")
+        logger.debug('[metrics] Starting metrics task...')
 
         async def func_wrapper() -> None:
             """Wrapper function for a better error mesage when coroutine fails"""
@@ -190,13 +190,13 @@ class ArqPrometheusMetrics:
         self._metrics_task = asyncio.create_task(func_wrapper())
 
     def generate_metrics(self, data: dict):
-        self.jobs_completed.set(data["completed"])
-        self.jobs_failed.set(data["failed"])
-        self.jobs_retried.set(data["retried"])
-        self.jobs_ongoing.set(data["ongoing"])
-        self.jobs_queued.set(data["queued"])
+        self.jobs_completed.set(data['completed'])
+        self.jobs_failed.set(data['failed'])
+        self.jobs_retried.set(data['retried'])
+        self.jobs_ongoing.set(data['ongoing'])
+        self.jobs_queued.set(data['queued'])
 
     def start_webserver(self) -> None:
         """Start web server in a different thread."""
         prom.start_wsgi_server(self.port, addr=self.addr, registry=self.registry)
-        logger.info(f"[metrics] Running at: http://{self.addr}:{self.port}/")
+        logger.info(f'[metrics] Running at: http://{self.addr}:{self.port}/')

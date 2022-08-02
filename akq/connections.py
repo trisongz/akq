@@ -281,4 +281,3 @@ async def log_keydb_info(keydb: AsyncKeyDB, log_func: Callable[[str], Any]) -> N
         f'clients_connected={clients_connected} '
         f'db_keys={key_count}'
     )
-
