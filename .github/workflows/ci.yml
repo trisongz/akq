@@ -28,21 +28,21 @@ jobs:
 
     - run: make mypy
 
-  docs:
-    runs-on: ubuntu-latest
+  # docs:
+  #   runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v2
+  #   steps:
+  #   - uses: actions/checkout@v2
 
-    - name: set up python
-      uses: actions/setup-python@v1
-      with:
-        python-version: 3.9
+  #   - name: set up python
+  #     uses: actions/setup-python@v1
+  #     with:
+  #       python-version: 3.9
 
-    - run: pip install -r docs/requirements.txt
-    - run: pip install .
+  #   - run: pip install -r docs/requirements.txt
+  #   - run: pip install .
 
-    - run: make docs
+  #   - run: make docs
 
   test:
     name: test py${{ matrix.python-version }} on ${{ matrix.os }}
