@@ -23,6 +23,7 @@ def registry():
 def arq_prom_instance(registry):
     return ArqPrometheusMetrics(ctx={}, registry=registry, enable_webserver=False)
 
+
 @pytest.fixture(name='loop')
 def _fix_loop(event_loop):
     return event_loop
