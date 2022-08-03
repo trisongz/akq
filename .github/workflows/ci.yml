@@ -105,8 +105,8 @@ jobs:
           make install
           pip install -U wheel twine
 
-      - name: set version
-        run: VERSION_PATH='akq/version.py' python <(curl -Ls https://git.io/JT3rm)
+      #- name: set version
+      #  run: VERSION_PATH='akq/version.py' python <(curl -Ls https://git.io/JT3rm)
 
       - name: build
         run: python setup.py sdist bdist_wheel
